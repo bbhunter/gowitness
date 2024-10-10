@@ -4,7 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ExternalLink, ChevronLeft, ChevronRight, Code, ClockIcon, Trash2Icon, DownloadIcon, ImagesIcon, ZoomInIcon, XIcon } from 'lucide-react';
+import { ExternalLink, ChevronLeft, ChevronRight, Code, ClockIcon, Trash2Icon, DownloadIcon, ImagesIcon, ZoomInIcon, CopyIcon } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, } from "@/components/ui/dialog";
 import { WideSkeleton } from '@/components/loading';
 import { Form, Link, useNavigate, useParams } from 'react-router-dom';
@@ -31,9 +31,33 @@ const ScreenshotDetailPage = () => {
   const { id } = useParams<{ id: string; }>();
   if (!id) throw new Error("Somehow, detail id is not defined");
 
+  const currentId: number = parseInt(id, 10);
+
   useEffect(() => {
     getData(setLoading, setDetail, setWappalyzer, setDuration, id);
   }, [id]);
+
+  // handle arrowleft and arrowright events
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'ArrowLeft') {
+        if (currentId > 1) {
+          navigate(`/screenshot/${currentId - 1}`);
+        }
+      }
+
+      if (event.key === 'ArrowRight') {
+        navigate(`/screenshot/${currentId + 1}`);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    // cleanup when this component is no longer mounted
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [currentId, navigate]);
 
   const getLogTypeColor = (type: string) => {
     if (type === 'console.warning' || type === 'console.warn') return "bg-yellow-500 text-black";
@@ -76,17 +100,17 @@ const ScreenshotDetailPage = () => {
   const timeAgo = formatDistanceToNow(probedDate, { addSuffix: true });
   const rawDate = format(probedDate, "PPpp");
 
-  const getNavigation = (id: string) => {
+  const getNavigation = () => {
     return (
       <div className="flex justify-between items-center">
         <div className="flex space-x-2">
-          <Link to={"/screenshot/" + (parseInt(id) - 1).toString()}>
-            <Button variant="outline" size="sm" disabled={parseInt(id) <= 1}>
+          <Link to={"/screenshot/" + (currentId - 1)} >
+            <Button variant="outline" size="sm" disabled={currentId <= 1}>
               <ChevronLeft className="mr-2 h-4 w-4" />
               Previous
             </Button>
           </Link>
-          <Link to={"/screenshot/" + (parseInt(id) + 1).toString()}>
+          <Link to={"/screenshot/" + (currentId + 1)}>
             <Button variant="outline" size="sm">
               Next
               <ChevronRight className="ml-2 h-4 w-4" />
@@ -158,7 +182,11 @@ const ScreenshotDetailPage = () => {
             <DialogTrigger asChild>
               <button className="w-full relative">
                 <img
-                  src={api.endpoints.screenshot.path + "/" + detail.file_name}
+                  src={
+                    detail.screenshot
+                      ? `data:image/png;base64,${detail.screenshot}`
+                      : api.endpoints.screenshot.path + "/" + detail.file_name
+                  }
                   alt={detail.title}
                   className="w-full h-auto object-cover transition-all duration-300 filter group-hover:brightness-75 rounded-lg"
                 />
@@ -174,11 +202,25 @@ const ScreenshotDetailPage = () => {
                   alt={detail.title}
                   className="w-full h-full object-contain"
                 />
+                <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/100 to-transparent p-4 text-white">
+                  <a
+                    href={detail.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-lg font-semibold hover:underline flex items-center mb-2"
+                  >
+                    {detail.url}
+                    <ExternalLink className="ml-2 h-4 w-4" />
+                  </a>
+                  <div className="flex items-center text-sm opacity-80">
+                    <ClockIcon className="mr-2 h-4 w-4" />
+                    Captured on {format(new Date(detail.probed_at), "PPpp")}
+                  </div>
+                </div>
                 <button
                   onClick={() => setIsModalOpen(false)}
-                  className="absolute top-4 right-4 p-2 bg-black bg-opacity-50 rounded-full text-white hover:bg-opacity-75 transition-all"
+                  className="absolute top-4 right-4 p-2 bg-black/50 rounded-full text-white hover:bg-black/75 transition-all"
                 >
-                  <XIcon className="w-6 h-6" />
                 </button>
               </div>
             </DialogContent>
@@ -210,19 +252,25 @@ const ScreenshotDetailPage = () => {
                 View HTML
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[625px]">
+            <DialogContent className="max-w-[90vw] w-full max-h-[90vh]">
               <DialogHeader>
-                <DialogTitle>HTML Content</DialogTitle>
-                <DialogDescription>
-                  The HTML content of the page is shown below.
-                </DialogDescription>
+                <DialogTitle>
+                  HTML Content
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="ml-4"
+                    onClick={() => copyToClipboard(detail.html, 'HTML Source')}
+                  >
+                    <CopyIcon className="mr-2 h-4 w-4" />
+                    Copy
+                  </Button>
+                </DialogTitle>
               </DialogHeader>
-              <ScrollArea className="h-[350px] w-full rounded-md border p-4">
+              <ScrollArea className="h-[400px] w-full rounded-md border p-4">
                 <pre className="text-sm">{detail.html}</pre>
               </ScrollArea>
-              <Button onClick={() => copyToClipboard(detail.html, 'HTML Source')}>
-                Copy HTML Content
-              </Button>
+
             </DialogContent>
           </Dialog>
         </CardHeader>
@@ -640,7 +688,7 @@ const ScreenshotDetailPage = () => {
 
   return (
     <div className="space-y-6">
-      {getNavigation(id)}
+      {getNavigation()}
       <div className="flex flex-col lg:flex-row gap-4">
         {/* Left Column */}
         <div className="w-full lg:w-2/5 space-y-4">
