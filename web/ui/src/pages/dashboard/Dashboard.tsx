@@ -77,7 +77,7 @@ export default function DashboardPage() {
         <CardContent>
           <ChartContainer config={chartConfig} className="aspect-auto h-[350px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={stats?.response_code_stats}>
+              <BarChart data={stats?.response_code_stats ?? []}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis
                   dataKey="code"
