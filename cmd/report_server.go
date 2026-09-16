@@ -1,7 +1,12 @@
 package cmd
 
 import (
+	"net/url"
+	"os"
+	"path/filepath"
+
 	"github.com/sensepost/gowitness/internal/ascii"
+	"github.com/sensepost/gowitness/pkg/log"
 	"github.com/sensepost/gowitness/web"
 	"github.com/spf13/cobra"
 )
@@ -12,6 +17,7 @@ var serverCmdFlags = struct {
 	DbUri          string
 	ScreenshotPath string
 }{}
+
 var serverCmd = &cobra.Command{
 	Use:   "server",
 	Short: "Start the web user interface",
@@ -24,12 +30,15 @@ Start the web user interface.`)),
 - gowitness report server --port 8080 --db-uri /tmp/gowitness.sqlite3
 - gowitness report server --screenshot-path /tmp/screenshots`),
 	Run: func(cmd *cobra.Command, args []string) {
+		warnIfSQLiteDatabaseMissing(serverCmdFlags.DbUri)
+
 		server := web.NewServer(
 			serverCmdFlags.Host,
 			serverCmdFlags.Port,
 			serverCmdFlags.DbUri,
 			serverCmdFlags.ScreenshotPath,
 		)
+
 		server.Run()
 	},
 }
@@ -41,4 +50,16 @@ func init() {
 	serverCmd.Flags().IntVar(&serverCmdFlags.Port, "port", 7171, "The port to start the web server on")
 	serverCmd.Flags().StringVar(&serverCmdFlags.DbUri, "db-uri", "sqlite://gowitness.sqlite3", "The database URI to use. Supports SQLite, MySQL, and PostgreSQL. Examples: sqlite://gowitness.sqlite3, mysql://user:pass@localhost:3306/gowitness, postgres://user:pass@localhost:5432/gowitness")
 	serverCmd.Flags().StringVar(&serverCmdFlags.ScreenshotPath, "screenshot-path", "./screenshots", "The path where screenshots are stored")
+}
+
+func warnIfSQLiteDatabaseMissing(uri string) {
+	db, err := url.Parse(uri)
+	if err != nil || db.Scheme != "sqlite" {
+		return
+	}
+
+	dbPath := filepath.Join(db.Host, db.Path)
+	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+		log.Warn("An existing sqlite database does not exist. A new database will be created", "path", dbPath)
+	}
 }
